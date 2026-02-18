@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Studenti - Lettura e Modifica</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #999; padding: 8px; }
+    th { background: #f2f2f2; }
+    td[contenteditable="true"] { background: #fffbe6; }
+    .azioni button { margin-right: 6px; }
+    .msg { margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+<h2>Elenco Studenti</h2>
+
+<table id="tabellaStudenti">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Cognome</th>
+      <th>Nome</th>
+      <th>Data di nascita</th>
+      <th>ID Classe</th>
+      <th>Azioni</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div class="msg" id="msg"></div>
+
+<script>
+const tbody = document.querySelector("#tabellaStudenti tbody");
+const msg = document.getElementById("msg");
+
+function setMsg(testo, ok=true){
+  msg.textContent = testo;
+  msg.style.color = ok ? "green" : "red";
+}
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+async function caricaStudenti(){
+  setMsg("Caricamento...", true);
+  tbody.innerHTML = "";
+
+  try{
+    const res = await fetch("get_studenti.php");
+    const data = await res.json();
+
+    if(!res.ok || !data.ok){
+      setMsg(data.message || "Errore caricamento", false);
+      return;
+    }
+
+    data.studenti.forEach(s => {
+      const tr = document.createElement("tr");
+      tr.dataset.id = s.id_studente;
+
+      tr.innerHTML = `
+        <td>${escapeHtml(s.id_studente)}</td>
+        <td contenteditable="true" data-field="cognome">${escapeHtml(s.cognome)}</td>
+        <td contenteditable="true" data-field="nome">${escapeHtml(s.nome)}</td>
+        <td contenteditable="true" data-field="data_nascita">${escapeHtml(s.data_nascita)}</td>
+        <td contenteditable="true" data-field="id_classe">${escapeHtml(s.id_classe)}</td>
+        <td class="azioni">
+          <button type="button" class="salva">Salva</button>
+          <button type="button" class="annulla">Annulla</button>
+        </td>
+      `;
+
+      // Salvo i valori originali per "Annulla"
+      [...tr.querySelectorAll('[data-field]')].forEach(td => {
+        td.dataset.original = td.textContent.trim();
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    setMsg(`Caricati ${data.studenti.length} studenti.`, true);
+
+  }catch(e){
+    setMsg("Errore di rete o server non raggiungibile.", false);
+  }
+}
+
+function leggiRiga(tr){
+  const obj = { id_studente: parseInt(tr.dataset.id, 10) };
+
+  tr.querySelectorAll("[data-field]").forEach(td => {
+    const field = td.dataset.field;
+    obj[field] = td.textContent.trim();
+  });
+
+  return obj;
+}
+
+function ripristinaRiga(tr){
+  tr.querySelectorAll("[data-field]").forEach(td => {
+    td.textContent = td.dataset.original || "";
+  });
+}
+
+function aggiornaOriginali(tr){
+  tr.querySelectorAll("[data-field]").forEach(td => {
+    td.dataset.original = td.textContent.trim();
+  });
+}
+
+async function salvaRiga(tr){
+  const payload = leggiRiga(tr);
+
+  // Validazioni minime lato client
+  if(!payload.cognome || !payload.nome){
+    setMsg("Cognome e Nome sono obbligatori.", false);
+    return;
+  }
+  // data_nascita: se presente deve essere YYYY-MM-DD
+  if(payload.data_nascita && !/^\d{4}-\d{2}-\d{2}$/.test(payload.data_nascita)){
+    setMsg("Data di nascita non valida. Usa formato YYYY-MM-DD (es. 2007-09-15).", false);
+    return;
+  }
+  if(!payload.id_classe){
+    setMsg("ID Classe è obbligatorio (vincolo di chiave esterna).", false);
+    return;
+  }
+
+  try{
+    const res = await fetch("update_studente.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || !data.ok){
+      setMsg(data.message || "Errore durante il salvataggio.", false);
+      return;
+    }
+
+    aggiornaOriginali(tr);
+    setMsg("Salvataggio completato.", true);
+
+  }catch(e){
+    setMsg("Errore di rete durante il salvataggio.", false);
+  }
+}
+
+tbody.addEventListener("click", (e) => {
+  const tr = e.target.closest("tr");
+  if(!tr) return;
+
+  if(e.target.classList.contains("salva")){
+    salvaRiga(tr);
+  }
+  if(e.target.classList.contains("annulla")){
+    ripristinaRiga(tr);
+    setMsg("Modifiche annullate.", true);
+  }
+});
+
+caricaStudenti();
+</script>
+
+</body>
+</html>
