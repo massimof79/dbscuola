@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Inserimento Studente</title>
+</head>
+<body>
+
+<h2>Inserisci nuovo studente</h2>
+
+<form id="formStudente">
+    <label>Cognome:</label><br>
+    <input type="text" id="cognome" required><br><br>
+
+    <label>Nome:</label><br>
+    <input type="text" id="nome" required><br><br>
+
+    <label>Data di nascita:</label><br>
+    <input type="date" id="data_nascita" required><br><br>
+
+    <label>ID Classe:</label><br>
+    <input type="text" id="id_classe" required><br><br>
+
+    <button type="submit">Inserisci</button>
+</form>
+
+<p id="risultato"></p>
+
+<script>
+document.getElementById("formStudente").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const studente = {
+        cognome: document.getElementById("cognome").value,
+        nome: document.getElementById("nome").value,
+        data_nascita: document.getElementById("data_nascita").value,
+        id_classe: document.getElementById("id_classe").value
+    };
+
+    fetch("insert_studente.php", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(studente)
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("risultato").innerText = data.message;
+        document.getElementById("formStudente").reset();
+    })
+    .catch(err => {
+        document.getElementById("risultato").innerText = "Errore durante l'inserimento";
+    });
+});
+</script>
+
+</body>
+</html>
